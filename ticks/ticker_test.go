@@ -1,6 +1,7 @@
 package ticks
 
 import (
+	"log"
 	"net/http"
 	"net/http/pprof"
 	"sync"
@@ -26,8 +27,17 @@ func TestOne(t *testing.T) {
 	wg.Wait()
 }
 
+func startHttpServer() {
+	http.HandleFunc("/", pprof.Index)
+	err := http.ListenAndServe(":6060", nil)
+	if err != nil {
+		log.Printf("ListenAndServe err:%#v", err)
+	}
+}
+
 func TestTicker(t *testing.T) {
 	m := map[int]TickerI{}
+	go startHttpServer()
 
 	num := 10000
 	resultChan := make(chan int, 1)
@@ -50,22 +60,11 @@ func TestTicker(t *testing.T) {
 		}
 	}()
 
-	go func() {
-		for i := 0; i < num; i++ {
-			res := <-resultChan
-			t.Log(res)
-		}
+	for i := 0; i < num; i++ {
+		res := <-resultChan
+		t.Log(res)
+	}
 
-		t.Log("全部关闭")
-
-		go func() {
-			http.HandleFunc("/", pprof.Index)
-			err := http.ListenAndServe(":6060", nil)
-			if err != nil {
-				t.Logf("ListenAndServe err:%#v", err)
-			}
-		}()
-	}()
-
+	t.Log("全部关闭")
 	select {}
 }
