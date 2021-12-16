@@ -27,7 +27,7 @@ func TestOne(t *testing.T) {
 	wg.Wait()
 }
 
-func startHttpServer() {
+func startHTTPServer() {
 	http.HandleFunc("/", pprof.Index)
 	err := http.ListenAndServe(":6060", nil)
 	if err != nil {
@@ -35,36 +35,35 @@ func startHttpServer() {
 	}
 }
 
-func TestTicker(t *testing.T) {
-	m := map[int]TickerI{}
-	go startHttpServer()
+func createTickers(count int) []TickerI {
+	list := make([]TickerI, count)
+	for i := 0; i < count; i++ {
+		list[i] = NewTicker(time.Millisecond * 33)
+	}
+	return list
+}
 
-	num := 10000
+func TestTicker(t *testing.T) {
+	m := createTickers(10000)
 	resultChan := make(chan int, 1)
 
-	go func() {
-		for i := 0; i < num; i++ {
-			ti := NewTicker(time.Millisecond * 33)
-			m[i] = ti
-		}
-
-		for i := 0; i < num; i++ {
-			ti := m[i]
-			ti.Tick(func(i int) func() {
-				return func() {
-					ti := m[i]
-					ti.Stop()
-					resultChan <- i
-				}
-			}(i))
-		}
-	}()
-
-	for i := 0; i < num; i++ {
-		res := <-resultChan
-		t.Log(res)
+	// var wg sync.WaitGroup
+	for i := 0; i < len(m); i++ {
+		// wg.Add(1)
+		localI := i
+		ti := m[i]
+		ti.Tick(func() {
+			ti.Stop()
+			// wg.Done()
+			resultChan <- localI
+		})
 	}
 
-	t.Log("全部关闭")
-	select {}
+	for i := 0; i < len(m); i++ {
+		res := <-resultChan
+		t.Logf("received: %d", res)
+	}
+
+	t.Log("全部关闭,等待10秒")
+	time.Sleep(10 * time.Second)
 }
